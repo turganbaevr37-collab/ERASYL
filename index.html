@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PulseHealth - Трекер Здоровья и Активности</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                        },
+                        darkbg: '#0f172a',
+                        darkcard: '#1e293b',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Кастомный скроллбар */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        /* Плавные переходы для графиков и UI */
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col md:flex-row font-sans selection:bg-brand-500 selection:text-white">
+
+    <!-- Боковая навигация (Sidebar) -->
+    <aside class="w-full md:w-64 bg-slate-950/80 backdrop-blur-md border-r border-slate-800 flex flex-col justify-between shrink-0 sticky top-0 z-50 md:h-screen">
+        <div>
+            <!-- Логотип -->
+            <div class="p-6 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center text-white shadow-lg shadow-brand-500/20">
+                        <i class="fa-solid font-bold fa-heart-pulse text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg leading-none tracking-tight">Pulse<span class="text-brand-500">Health</span></h1>
+                        <span class="text-xs text-slate-400">Трекинг жизни</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Навигационные пункты -->
+            <nav class="px-4 space-y-1">
+                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-slate-300 hover:bg-slate-800/60 hover:text-white transition-all text-sm">
+                    <i class="fa-solid fa-chart-pie w-5 text-center text-brand-500"></i>
+                    <span>Главная панель</span>
+                </button>
+                <button onclick="switchTab('activity')" id="nav-activity" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-slate-300 hover:bg-slate-800/60 hover:text-white transition-all text-sm">
+                    <i class="fa-solid fa-person-running w-5 text-center text-amber-500"></i>
+                    <span>Тренировки</span>
+                </button>
+                <button onclick="switchTab('nutrition')" id="nav-nutrition" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-slate-300 hover:bg-slate-800/60 hover:text-white transition-all text-sm">
+                    <i class="fa-solid fa-utensils w-5 text-center text-sky-500"></i>
+                    <span>Питание</span>
+                </button>
+                <button onclick="switchTab('analytics')" id="nav-analytics" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-slate-300 hover:bg-slate-800/60 hover:text-white transition-all text-sm">
+                    <i class="fa-solid fa-chart-line w-5 text-center text-purple-500"></i>
+                    <span>Аналитика</span>
+                </button>
+                <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-slate-300 hover:bg-slate-800/60 hover:text-white transition-all text-sm">
+                    <i class="fa-solid fa-sliders w-5 text-center text-rose-500"></i>
+                    <span>Настройки целей</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Профиль / Сброс данных -->
+        <div class="p-4 border-t border-slate-800/60">
+            <div class="flex items-center justify-between bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 font-semibold text-sm">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-white">Мой Профиль</p>
+                        <p class="text-[10px] text-slate-400">Пользователь</p>
+                    </div>
+                </div>
+                <button onclick="resetAllData()" title="Сбросить все данные" class="text-slate-500 hover:text-red-400 transition-colors p-1.5">
+                    <i class="fa-solid fa-trash-arrow-up text-xs"></i>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Основная область содержимого -->
+    <main class="flex-1 p-4 md:p-8 overflow-y-auto max-w-7xl mx-auto w-full space-y-6">
+
+        <!-- Уведомления / Тост -->
+        <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-800 border border-slate-700 text-slate-200 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3">
+            <i id="toast-icon" class="fa-solid fa-circle-check text-brand-500"></i>
+            <span id="toast-message" class="text-sm font-medium">Действие выполнено</span>
+        </div>
+
+        <!-- ================= PAGE 1: DASHBOARD ================= -->
+        <section id="tab-dashboard" class="tab-content space-y-6">
+            <!-- Шапка Дашборда -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-800/50 via-slate-800/20 to-transparent p-6 rounded-2xl border border-slate-800">
+                <div>
+                    <h2 class="text-2xl font-bold text-white">Обзор здоровья за сегодня 👋</h2>
+                    <p class="text-slate-400 text-sm mt-1">Отслеживайте свои ежедневные показатели и достигайте целей!</p>
+                </div>
+                <div class="flex items-center gap-3 bg-slate-800/80 px-4 py-2 rounded-xl border border-slate-700/60 w-fit">
+                    <i class="fa-regular fa-calendar text-brand-500"></i>
+                    <span id="current-date-str" class="text-xs md:text-sm font-medium text-slate-300">--</span>
+                </div>
+            </div>
+
+            <!-- Виджеты показателей (4 карточки) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                
+                <!-- Вода -->
+                <div class="bg-slate-800/50 border border-slate-700/60 rounded-2xl p-5 card-hover relative overflow-hidden group">
+                    <div class="absolute -right-4 -bottom-4 text-sky-500/10 group-hover:text-sky-500/20 transition-all">
+                        <i class="fa-solid fa-glass-water text-8xl"></i>
+                    </div>
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-3 bg-sky-500/10 rounded-xl text-sky-400 border border-sky-500/20">
+                            <i class="fa-solid fa-droplet text-lg"></i>
+                        </div>
+                        <span class="text-xs font-semibold px-2.5 py-1 bg-slate-700/50 text-slate-300 rounded-lg" id="water-goal-badge">Цель: 2000 мл</span>
+                    </div>
+                    <div class="space-y-1">
+                        <span class="text-xs text-slate-400 font-medium">Вода</span>
+                        <div class="flex items-baseline gap-2">
+                            <h3 class="text-2xl font-bold text-white" id="dash-water-val">0</h3>
+                            <span class="text-xs text-slate-400">мл</span>
+                        </div>
+                    </div>
+                    <!-- Прогресс бассен -->
+                    <div class="w-full bg-slate-700/50 h-2 rounded-full mt-4 overflow-hidden">
+                        <div id="dash-water-bar" class="bg-sky-500 h-full transition-all duration-500 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <!-- Кнопки быстрого добавления -->
+                    <div class="mt-4 flex gap-2">
+                        <button onclick="addWater(250)" class="flex-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 text-xs py-2 rounded-lg font-medium transition-colors">
+                            +250 мл
+                        </button>
+                        <button onclick="addWater(500)" class="flex-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 text-xs py-2 rounded-lg font-medium transition-colors">
+                            +500 мл
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Шаги -->
+                <div class="bg-slate-800/50 border border-slate-700/60 rounded-2xl p-5 card-hover relative overflow-hidden group">
+                    <div class="absolute -right-4 -bottom-4 text-emerald-500/10 group-hover:text-emerald-500/20 transition-all">
+                        <i class="fa-solid fa-shoe-prints text-8xl"></i>
+                    </div>
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-3 bg-emerald-500/10 rounded-xl text-emerald-400 border border-emerald-500/20">
+                            <i class="fa-solid fa-person-walking text-lg"></i>
+                        </div>
+                        <span class="text-xs font-semibold px-2.5 py-1 bg-slate-700/50 text-slate-300 rounded-lg" id="steps-goal-badge">Цель: 10000</span>
+                    </div>
+                    <div class="space-y-1">
+                        <span class="text-xs text-slate-400 font-medium">Шаги</span>
+                        <div class="flex items-baseline gap-2">
+                            <h3 class="text-2xl font-bold text-white" id="dash-steps-val">0</h3>
+                            <span class="text-xs text-slate-400">шагов</span>
+                        </div>
+                    </div>
+                    <div class="w-full bg-slate-700/50 h-2 rounded-full mt-4 overflow-hidden">
+                        <div id="dash-steps-bar" class="bg-emerald-500 h-full transition-all duration-500 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <div class="mt-4 flex gap-2">
+                        <button onclick="quickAddSteps(1000)" class="flex-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs py-2 rounded-lg font-medium transition-colors">
+                            +1000
+                        </button>
+                        <button onclick="quickAddSteps(3000)" class="flex-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs py-2 rounded-lg font-medium transition-colors">
+                            +3000
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Калории -->
+                <div class="bg-slate-800/50 border border-slate-700/60 rounded-2xl p-5 card-hover relative overflow-hidden group">
+                    <div class="absolute -right-4 -bottom-4 text-amber-500/10 group-hover:text-amber-500/20 transition-all">
+                        <i class="fa-solid fa-fire text-8xl"></i>
+                    </div>
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-3 bg-amber-500/10 rounded-xl text-amber-400 border border-amber-500/20">
+                            <i class="fa-solid fa-fire-flame-curved text-lg"></i>
+                        </div>
+                        <span class="text-xs font-semibold px-2.5 py-1 bg-slate-700/50 text-slate-300 rounded-lg" id="calories-goal-badge">Цель: 2200</span>
+                    </div>
+                    <div class="space-y-1">
+                        <span class="text-xs text-slate-400 font-medium">Калории (Съедено)</span>
+                        <div class="flex items-baseline gap-2">
+                            <h3 class="text-2xl font-bold text-white" id="dash-calories-val">0</h3>
+                            <span class="text-xs text-slate-400">ккал</span>
+                        </div>
+                    </div>
+                    <div class="w-full bg-slate-700/50 h-2 rounded-full mt-4 overflow-hidden">
+                        <div id="dash-calories-bar" class="bg-amber-500 h-full transition-all duration-500 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <div class="mt-4 flex items-center justify-between text-xs text-slate-400">
+                        <span>Сожжено за тренировки:</span>
+                        <span class="text-amber-400 font-semibold" id="dash-burned-val">0 ккал</span>
+                    </div>
+                </div>
+
+                <!-- Сон -->
+                <div class="bg-slate-800/50 border border-slate-700/60 rounded-2xl p-5 card-hover relative overflow-hidden group">
+                    <div class="absolute -right-4 -bottom-4 text-purple-500/10 group-hover:text-purple-500/20 transition-all">
+                        <i class="fa-solid fa-moon text-8xl"></i>
+                    </div>
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-3 bg-purple-500/10 rounded-xl text-purple-400 border border-purple-500/20">
+                            <i class="fa-solid fa-bed text-lg"></i>
+                        </div>
+                        <span class="text-xs font-semibold px-2.5 py-1 bg-slate-700/50 text-slate-300 rounded-lg" id="sleep-goal-badge">Цель: 8 ч</span>
+                    </div>
+                    <div class="space-y-1">
+                        <span class="text-xs text-slate-400 font-medium">Сон за ночь</span>
+                        <div class="flex items-baseline gap-2">
+                            <h3 class="text-2xl font-bold text-white" id="dash-sleep-val">0</h3>
+                            <span class="text-xs text-slate-400">часов</span>
+                        </div>
+                    </div>
+                    <div class="w-full bg-slate-700/50 h-2 rounded-full mt-4 overflow-hidden">
+                        <div id="dash-sleep-bar" class="bg-purple-500 h-full transition-all duration-500 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <div class="mt-4 flex gap-2">
+                        <button onclick="addSleep(0.5)" class="flex-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/30 text-xs py-2 rounded-lg font-medium transition-colors">
+                            +0.5 ч
+                        </button>
+                        <button onclick="addSleep(1)" class="flex-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/30 text-xs py-2 rounded-lg font-medium transition-colors">
+                            +1 ч
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Нижняя часть дашборда: Сводка БЖУ и Последние активности -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Соотношение БЖУ -->
+                <div class="bg-slate-800/50 border border-slate-700/60 rounded-2xl p-6 flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-base font-semibold text-white mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-pie-chart text-sky-400"></i> Баланс БЖУ сегодня
+                        </h3>
+                        <div class="h-48 relative flex items-center justify-center">
+                            <canvas id="macrosDonutChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 mt-4 text-center">
+                        <div class="bg-slate-900/50 p-2.5 rounded-xl border border-slate-700/40">
+                            <span class="text-[11px] text-slate-400 block">Белки</span>
+                            <span class="text-sm font-bold text-sky-400" id="macro-p">0г</span>
+                        </div>
+                        <div class="bg-slate-900/50 p-2.5 rounded-xl border border-slate-700/40">
+                            <span class="text-[11px] text-slate-400 block">Жиры</span>
+                            <span class="text-sm font-bold text-amber-400" id="macro-f">0г</span>
+                        </div>
+                        <div class="bg-slate-900/50 p-2.5 rounded-xl border border-slate-700/40">
+                            <span class="text-[11px] text-slate-400 block">Углеводы</span>
+                            <span class="text-sm font-bold text-emerald-400" id="macro-c">0г</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Быстрые списки последних записей -->
+                <div class="lg:col-span-2 bg-slate-800/50 border border-slate-700/60 rounded-2xl p-6 flex flex-col">
+                    <h3 class="text-base font-semibold text-white mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-brand-500"></i> Последняя активность
+                    </h3>
+                    <div class="flex-1 overflow-y-auto max-h-[220px] space-y-3 pr-1" id="dash-recent-list">
+                        <!-- Заполняется динамически -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= PAGE 2: WORKOUT TRACKER ================= -->
+        <section id="tab-activity" class="tab-content hidden space-y-6">
+            <div class="bg-slate-800/50 border border-slate-700/60 p-6 rounded-2xl">
+                <h2 class="text-xl font-bold text-white mb-1">Трекер тренировок</h2>
+                <p class="text-slate-400 text-sm mb-6">Записывайте ваши физические нагрузки и сжигайте калории</p>
+
+                <!-- Форма добавления активности -->
+                <form id="workout-form" onsubmit="handleWorkoutSubmit(event)" class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1.5 font-medium">Тип тренировки</label>
+                        <select id="workout-type" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+                            <option value="Бег">🏃‍♂️ Бег</option>
+                            <option value="Ходьба">🚶‍♂️ Ходьба</option>
+                            <option value="Велосипед">🚴‍♂️ Велосипед</option>
+                            <option value="Плавание">🏊‍♂️ Плавание</option>
+                            <option value="Силовая">🏋️‍♂️ Силовая тренировка</option>
+                            <option value="Йога">🧘‍♀️ Йога / Растяжка</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1.5 font-medium">Длительность (мин)</label>
+                        <input type="number" id="workout-duration" required min="1" placeholder="30" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1.5 font-medium">Сожжено калорий (ккал)</label>
+                        <input type="number" id="workout-calories" required min="1" placeholder="250" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div class="flex items-end">
+                        <button type="submit" class="w-full bg-brand-600 hover:bg-brand-500 text-white font-medium py-2 px-4 rounded-lg text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-600/20">
+                            <i class="fa-solid fa-plus"></i> Добавить
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Список записей -->
+            <div class="bg-slate-800/50 border border-slate-700/60 p-6 rounded-2xl">
+                <h3 class="text-lg font-semibold text-white mb-4">История тренировок</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-300">
+                        <thead class="bg-slate-900/60 text-xs uppercase text-slate-400 border-b border-slate-700/60">
+                            <tr>
+                                <th class="py-3 px-4">Вид</th>
+                                <th class="py-3 px-4">Длительность</th>
+                                <th class="py-3 px-4">Калории</th>
+                                <th class="py-3 px-4">Время</th>
+                                <th class="py-3 px-4 text-right">Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody id="workout-list-table" class="divide-y divide-slate-800">
+                            <!-- Элементы списка -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= PAGE 3: NUTRITION TRACKER ================= -->
+        <section id="tab-nutrition" class="tab-content hidden space-y-6">
+            <div class="bg-slate-800/50 border border-slate-700/60 p-6 rounded-2xl">
+                <h2 class="text-xl font-bold text-white mb-1">Дневник питания</h2>
+                <p class="text-slate-400 text-sm mb-6">Контролируйте калорийность и БЖУ вашего рациона</p>
+
+                <!-- Форма добавления еды -->
+                <form id="food-form" onsubmit="handleFoodSubmit(event)" class="grid grid-cols-1 md:grid-cols-6 gap-4 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                    <div class="md:col-span-2">
+                        <label class="block text-xs text-slate-400 mb-1.5 font-medium">Название блюда / приёма</label>
+                        <input type="text" id="food-name" required placeholder="Овсянка с ягодами" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1.5 font-medium">Калории (ккал)</label>
+                        <input type="number" id="food-calories" required min="0" placeholder="350" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1.5 font-medium">Белки (г)</label>
+                        <input type="number" id="food-p" min="0" placeholder="12" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1.5 font-medium">Жиры (г)</label>
+                        <input type="number" id="food-f" min="0" placeholder="6" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1.5 font-medium">Углеводы (г)</label>
+                        <input type="number" id="food-c" min="0" placeholder="50" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div class="md:col-span-6 flex justify-end">
+                        <button type="submit" class="bg-sky-600 hover:bg-sky-500 text-white font-medium py-2 px-6 rounded-lg text-sm transition-all flex items-center gap-2 shadow-lg shadow-sky-600/20">
+                            <i class="fa-solid fa-utensils"></i> Добавить приём пищи
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Таблица приёмов пищи -->
+            <div class="bg-slate-800/50 border border-slate-700/60 p-6 rounded-2xl">
+                <h3 class="text-lg font-semibold text-white mb-4">Приёмы пищи за сегодня</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-300">
+                        <thead class="bg-slate-900/60 text-xs uppercase text-slate-400 border-b border-slate-700/60">
+                            <tr>
+                                <th class="py-3 px-4">Наименование</th>
+                                <th class="py-3 px-4">Калории</th>
+                                <th class="py-3 px-4">Б / Ж / У</th>
+                                <th class="py-3 px-4">Время</th>
+                                <th class="py-3 px-4 text-right">Удалить</th>
+                            </tr>
+                        </thead>
+                        <tbody id="food-list-table" class="divide-y divide-slate-800">
+                            <!-- Элементы пищи -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= PAGE 4: ANALYTICS & CHARTS ================= -->
+        <section id="tab-analytics" class="tab-content hidden space-y-6">
+            <div class="bg-slate-800/50 border border-slate-700/60 p-6 rounded-2xl">
+                <h2 class="text-xl font-bold text-white mb-1">Аналитика и Графики</h2>
+                <p class="text-slate-400 text-sm mb-6">Прогресс по калориям и активности за последние 7 дней</p>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- График калорий -->
+                    <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                        <h3 class="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-simple text-amber-500"></i> Динамика калорий (ккал)
+                        </h3>
+                        <div class="h-64">
+                            <canvas id="weeklyCaloriesChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- График шагов -->
+                    <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                        <h3 class="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-emerald-500"></i> Активность шагов за неделю
+                        </h3>
+                        <div class="h-64">
+                            <canvas id="weeklyStepsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= PAGE 5: SETTINGS ================= -->
+        <section id="tab-settings" class="tab-content hidden space-y-6">
+            <div class="bg-slate-800/50 border border-slate-700/60 p-6 rounded-2xl max-w-2xl">
+                <h2 class="text-xl font-bold text-white mb-1">Настройки суточных целей</h2>
+                <p class="text-slate-400 text-sm mb-6">Задайте идеальные параметры для вашего образа жизни</p>
+
+                <form id="settings-form" onsubmit="handleSettingsSave(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Цель воды (мл)</label>
+                        <input type="number" id="setting-water" required step="50" min="500" class="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Цель шагов в день</label>
+                        <input type="number" id="setting-steps" required step="500" min="1000" class="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Цель калорий (ккал)</label>
+                        <input type="number" id="setting-calories" required step="50" min="500" class="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Цель сна (часов)</label>
+                        <input type="number" id="setting-sleep" required step="0.5" min="4" max="14" class="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500">
+                    </div>
+
+                    <button type="submit" class="w-full bg-brand-600 hover:bg-brand-500 text-white font-medium py-2.5 rounded-lg text-sm transition-all shadow-lg shadow-brand-600/20">
+                        Сохранить настройки
+                    </button>
+                </form>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Скрипт Логики -->
+    <script>
+        // Инициализация структуры данных
+        const DEFAULT_DATA = {
+            goals: {
+                water: 2000,
+                steps: 10000,
+                calories: 2200,
+                sleep: 8
+            },
+            today: {
+                water: 0,
+                steps: 0,
+                sleep: 0,
+            },
+            workouts: [],
+            foods: [],
+            // Демо данные за прошлые дни для аналитики
+            history: [
+                { day: 'Пн', calories: 2100, steps: 8400 },
+                { day: 'Вт', calories: 1950, steps: 10200 },
+                { day: 'Ср', calories: 2300, steps: 7600 },
+                { day: 'Чт', calories: 1800, steps: 11000 },
+                { day: 'Пт', calories: 2450, steps: 9500 },
+                { day: 'Сб', calories: 2000, steps: 12300 },
+                { day: 'Вс', calories: 0, steps: 0 } // Заполняется сегодня
+            ]
+        };
+
+        let appState = JSON.parse(localStorage.getItem('pulse_health_data')) || DEFAULT_DATA;
+
+        // Переменные для Chart.js экземпляров
+        let macrosChartInstance = null;
+        let weeklyCaloriesChartInstance = null;
+        let weeklyStepsChartInstance = null;
+
+        // При загрузке страницы
+        window.onload = function() {
+            // Форматирование даты
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('current-date-str').innerText = new Date().toLocaleDateString('ru-RU', options);
+
+            // Первичная отрисовка
+            updateUI();
+            initCharts();
+            switchTab('dashboard');
+        };
+
+        // Сохранение в LocalStorage
+        function saveData() {
+            localStorage.setItem('pulse_health_data', JSON.stringify(appState));
+            updateUI();
+        }
+
+        // Переключение вкладок
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-btn').forEach(el => {
+                el.classList.remove('bg-slate-800', 'text-white');
+                el.classList.add('text-slate-300');
+            });
+
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            const activeNav = document.getElementById(`nav-${tabId}`);
+            if (activeNav) {
+                activeNav.classList.add('bg-slate-800', 'text-white');
+            }
+
+            // Обновление графиков при переходе на аналитику
+            if (tabId === 'analytics') {
+                renderWeeklyCharts();
+            }
+        }
+
+        // Всплывающее уведомление (Toast)
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-message');
+            const toastIcon = document.getElementById('toast-icon');
+
+            toastMsg.innerText = message;
+            toastIcon.className = isError ? 'fa-solid fa-circle-xmark text-red-400' : 'fa-solid fa-circle-check text-brand-500';
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 2500);
+        }
+
+        // Обновление всех данных UI
+        function updateUI() {
+            // 1. Вода
+            const wVal = appState.today.water;
+            const wGoal = appState.goals.water;
+            document.getElementById('dash-water-val').innerText = wVal;
+            document.getElementById('water-goal-badge').innerText = `Цель: ${wGoal} мл`;
+            document.getElementById('dash-water-bar').style.width = `${Math.min((wVal / wGoal) * 100, 100)}%`;
+
+            // 2. Шаги
+            const sVal = appState.today.steps;
+            const sGoal = appState.goals.steps;
+            document.getElementById('dash-steps-val').innerText = sVal.toLocaleString();
+            document.getElementById('steps-goal-badge').innerText = `Цель: ${sGoal}`;
+            document.getElementById('dash-steps-bar').style.width = `${Math.min((sVal / sGoal) * 100, 100)}%`;
+
+            // 3. Калории
+            const eatenCalories = appState.foods.reduce((acc, f) => acc + f.calories, 0);
+            const burnedCalories = appState.workouts.reduce((acc, w) => acc + w.calories, 0);
+            const cGoal = appState.goals.calories;
+
+            document.getElementById('dash-calories-val').innerText = eatenCalories;
+            document.getElementById('dash-burned-val').innerText = `${burnedCalories} ккал`;
+            document.getElementById('calories-goal-badge').innerText = `Цель: ${cGoal}`;
+            document.getElementById('dash-calories-bar').style.width = `${Math.min((eatenCalories / cGoal) * 100, 100)}%`;
+
+            // 4. Сон
+            const slVal = appState.today.sleep;
+            const slGoal = appState.goals.sleep;
+            document.getElementById('dash-sleep-val').innerText = slVal;
+            document.getElementById('sleep-goal-badge').innerText = `Цель: ${slGoal} ч`;
+            document.getElementById('dash-sleep-bar').style.width = `${Math.min((slVal / slGoal) * 100, 100)}%`;
+
+            // 5. БЖУ
+            const totalP = appState.foods.reduce((acc, f) => acc + f.p, 0);
+            const totalF = appState.foods.reduce((acc, f) => acc + f.f, 0);
+            const totalC = appState.foods.reduce((acc, f) => acc + f.c, 0);
+
+            document.getElementById('macro-p').innerText = `${totalP}г`;
+            document.getElementById('macro-f').innerText = `${totalF}г`;
+            document.getElementById('macro-c').innerText = `${totalC}г`;
+
+            updateMacrosDonut(totalP, totalF, totalC);
+
+            // 6. Списки
+            renderWorkoutsTable();
+            renderFoodsTable();
+            renderRecentActivity();
+
+            // Поля настроек
+            document.getElementById('setting-water').value = appState.goals.water;
+            document.getElementById('setting-steps').value = appState.goals.steps;
+            document.getElementById('setting-calories').value = appState.goals.calories;
+            document.getElementById('setting-sleep').value = appState.goals.sleep;
+        }
+
+        // --- ДЕЙСТВИЯ С ВОДОЙ И ШАГАМИ ---
+        function addWater(amount) {
+            appState.today.water += amount;
+            saveData();
+            showToast(`Добавлено ${amount} мл воды`);
+        }
+
+        function quickAddSteps(amount) {
+            appState.today.steps += amount;
+            saveData();
+            showToast(`Добавлено ${amount} шагов`);
+        }
+
+        function addSleep(hours) {
+            appState.today.sleep = parseFloat((appState.today.sleep + hours).toFixed(1));
+            saveData();
+            showToast(`Добавлено ${hours} ч сна`);
+        }
+
+        // --- ТРЕНИРОВКИ ---
+        function handleWorkoutSubmit(e) {
+            e.preventDefault();
+            const type = document.getElementById('workout-type').value;
+            const duration = parseInt(document.getElementById('workout-duration').value);
+            const calories = parseInt(document.getElementById('workout-calories').value);
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            const newWorkout = { id: Date.now(), type, duration, calories, time };
+            appState.workouts.unshift(newWorkout);
+            
+            document.getElementById('workout-form').reset();
+            saveData();
+            showToast('Тренировка успешно добавлена!');
+        }
+
+        function deleteWorkout(id) {
+            appState.workouts = appState.workouts.filter(w => w.id !== id);
+            saveData();
+            showToast('Запись удалена', true);
+        }
+
+        function renderWorkoutsTable() {
+            const tbody = document.getElementById('workout-list-table');
+            if (appState.workouts.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-slate-500">Записей пока нет</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = appState.workouts.map(w => `
+                <tr class="hover:bg-slate-800/40 transition-colors">
+                    <td class="py-3 px-4 font-medium text-white">${w.type}</td>
+                    <td class="py-3 px-4">${w.duration} мин</td>
+                    <td class="py-3 px-4 text-amber-400 font-semibold">${w.calories} ккал</td>
+                    <td class="py-3 px-4 text-slate-400 text-xs">${w.time}</td>
+                    <td class="py-3 px-4 text-right">
+                        <button onclick="deleteWorkout(${w.id})" class="text-slate-500 hover:text-red-400 transition-colors">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // --- ПИТАНИЕ ---
+        function handleFoodSubmit(e) {
+            e.preventDefault();
+            const name = document.getElementById('food-name').value;
+            const calories = parseInt(document.getElementById('food-calories').value) || 0;
+            const p = parseInt(document.getElementById('food-p').value) || 0;
+            const f = parseInt(document.getElementById('food-f').value) || 0;
+            const c = parseInt(document.getElementById('food-c').value) || 0;
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            const newFood = { id: Date.now(), name, calories, p, f, c, time };
+            appState.foods.unshift(newFood);
+
+            document.getElementById('food-form').reset();
+            saveData();
+            showToast('Прием пищи добавлен!');
+        }
+
+        function deleteFood(id) {
+            appState.foods = appState.foods.filter(f => f.id !== id);
+            saveData();
+            showToast('Запись удалена', true);
+        }
+
+        function renderFoodsTable() {
+            const tbody = document.getElementById('food-list-table');
+            if (appState.foods.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-slate-500">Записей пока нет</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = appState.foods.map(f => `
+                <tr class="hover:bg-slate-800/40 transition-colors">
+                    <td class="py-3 px-4 font-medium text-white">${f.name}</td>
+                    <td class="py-3 px-4 text-amber-400 font-semibold">${f.calories} ккал</td>
+                    <td class="py-3 px-4 text-xs font-mono text-slate-400">
+                        <span class="text-sky-400">${f.p}г</span> / 
+                        <span class="text-amber-400">${f.f}г</span> / 
+                        <span class="text-emerald-400">${f.c}г</span>
+                    </td>
+                    <td class="py-3 px-4 text-slate-400 text-xs">${f.time}</td>
+                    <td class="py-3 px-4 text-right">
+                        <button onclick="deleteFood(${f.id})" class="text-slate-500 hover:text-red-400 transition-colors">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Сводный список на главной
+        function renderRecentActivity() {
+            const container = document.getElementById('dash-recent-list');
+            const combined = [
+                ...appState.workouts.map(w => ({ ...w, itemType: 'workout' })),
+                ...appState.foods.map(f => ({ ...f, itemType: 'food' }))
+            ].sort((a, b) => b.id - a.id).slice(0, 5);
+
+            if (combined.length === 0) {
+                container.innerHTML = `<p class="text-slate-500 text-sm text-center py-6">Сегодня ещё не было добавлено никаких записей</p>`;
+                return;
+            }
+
+            container.innerHTML = combined.map(item => {
+                if (item.itemType === 'workout') {
+                    return `
+                        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/50 border border-slate-800">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center text-sm">
+                                    <i class="fa-solid fa-fire"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-semibold text-white">Тренировка: ${item.type}</p>
+                                    <p class="text-[10px] text-slate-400">${item.duration} мин • ${item.time}</p>
+                                </div>
+                            </div>
+                            <span class="text-xs font-bold text-amber-400">-${item.calories} ккал</span>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/50 border border-slate-800">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center text-sm">
+                                    <i class="fa-solid fa-utensils"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-semibold text-white">${item.name}</p>
+                                    <p class="text-[10px] text-slate-400">Еда • ${item.time}</p>
+                                </div>
+                            </div>
+                            <span class="text-xs font-bold text-sky-400">+${item.calories} ккал</span>
+                        </div>
+                    `;
+                }
+            }).join('');
+        }
+
+        // --- НАСТРОЙКИ ---
+        function handleSettingsSave(e) {
+            e.preventDefault();
+            appState.goals.water = parseInt(document.getElementById('setting-water').value);
+            appState.goals.steps = parseInt(document.getElementById('setting-steps').value);
+            appState.goals.calories = parseInt(document.getElementById('setting-calories').value);
+            appState.goals.sleep = parseFloat(document.getElementById('setting-sleep').value);
+
+            saveData();
+            showToast('Цели сохранены!');
+        }
+
+        // --- CHART.JS ИНИЦИАЛИЗАЦИЯ И ОБНОВЛЕНИЕ ---
+        function initCharts() {
+            // Chart 1: Donut Macros
+            const ctxMacros = document.getElementById('macrosDonutChart').getContext('2d');
+            macrosChartInstance = new Chart(ctxMacros, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Белки', 'Жиры', 'Углеводы'],
+                    datasets: [{
+                        data: [0, 0, 0],
+                        backgroundColor: ['#38bdf8', '#fbbf24', '#34d399'],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    cutout: '75%'
+                }
+            });
+        }
+
+        function updateMacrosDonut(p, f, c) {
+            if (!macrosChartInstance) return;
+            const hasData = (p + f + c) > 0;
+            macrosChartInstance.data.datasets[0].data = hasData ? [p, f, c] : [1, 1, 1];
+            macrosChartInstance.data.datasets[0].backgroundColor = hasData 
+                ? ['#38bdf8', '#fbbf24', '#34d399'] 
+                : ['#334155', '#334155', '#334155'];
+            macrosChartInstance.update();
+        }
+
+        function renderWeeklyCharts() {
+            // Подготовка данных недели (подставляем сегодняшние калории и шаги в текущий день)
+            const currentEaten = appState.foods.reduce((acc, f) => acc + f.calories, 0);
+            const historyData = [...appState.history];
+            historyData[6] = { day: 'Вс (Сегодня)', calories: currentEaten, steps: appState.today.steps };
+
+            const labels = historyData.map(h => h.day);
+            const caloriesData = historyData.map(h => h.calories);
+            const stepsData = historyData.map(h => h.steps);
+
+            // Chart: Weekly Calories
+            const ctxCal = document.getElementById('weeklyCaloriesChart').getContext('2d');
+            if (weeklyCaloriesChartInstance) weeklyCaloriesChartInstance.destroy();
+
+            weeklyCaloriesChartInstance = new Chart(ctxCal, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Калории',
+                        data: caloriesData,
+                        backgroundColor: '#f59e0b',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            // Chart: Weekly Steps
+            const ctxSteps = document.getElementById('weeklyStepsChart').getContext('2d');
+            if (weeklyStepsChartInstance) weeklyStepsChartInstance.destroy();
+
+            weeklyStepsChartInstance = new Chart(ctxSteps, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Шаги',
+                        data: stepsData,
+                        borderColor: '#22c55e',
+                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        borderWidth: 3,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        // Сброс данных
+        function resetAllData() {
+            if (confirm("Вы действительно хотите сбросить все сохранённые данные трекера?")) {
+                localStorage.removeItem('pulse_health_data');
+                appState = JSON.parse(JSON.stringify(DEFAULT_DATA));
+                saveData();
+                showToast('Все данные сброшены', true);
+            }
+        }
+    </script>
+</body>
+</html>
